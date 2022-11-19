@@ -6,6 +6,9 @@ You can find the instaciation of the SQL curson on line 66 in AddDatabaseEntrySr
 # DO NOT CHANGE THE DRIVER
 Youll probably only need to change the password and database name, please check all of the cursor.execute() lines to make sure they match your database arguments.
 
+# AutomatedSkugsReplay is the HTTP Server
+Please also check the SQL in that project as well, make sure the cursor.execute() lines are formatted properly for your database and that the cursor is configured to login to your database.
+
 hope this helps
 
 ---Themail---
