@@ -1,6 +1,8 @@
 #include <iostream>
 #include <Windows.h>
 #include <Psapi.h>
+#include <fstream>
+#include <string>
 
 using namespace std;
 
@@ -20,9 +22,18 @@ DWORD GetBaseAddress(const HANDLE hProcess) {
 
 	return (DWORD)lphModule[0]; // Module 0 is apparently always the EXE itself, returning its address
 }
-
+bool isRunning(HWND hwnd)
+{
+	if (hwnd != 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
 int main()
 {
+	
 	int readP2Win = 0;
 	int readP1Win = 0;
 	HWND hwnd = FindWindowA(NULL, "Skullgirls Encore");
@@ -81,7 +92,7 @@ int main()
 		else
 		{
 			cout << "Press Num Pad 0 to Exit..." << endl;
-			cout << "Starting Python Server..." << endl;
+			
 			
 			int seconds;
 			while (true) 
@@ -89,43 +100,70 @@ int main()
 				seconds = 0;
 				ReadProcessMemory(handle, (PBYTE*)AddressOfP1Win, &readP1Win, sizeof(int), 0);
 				ReadProcessMemory(handle, (PBYTE*)AddressOfP2Win, &readP2Win, sizeof(int), 0);
+				
 				if (!readP1Win && !readP2Win) 
 				{
+					string numrounds;
+					int numRounds;
+					fstream file;
+					file.open("C:\\Users\\tanne\\OneDrive\\Documents\\Skullgirls\\Replays_SG2EPlus\\76561198132030993\\round_0001.ini");
+					for (int i = 0; i < 4; i++)
+					{
+						file >> numrounds;
+						if (i == 3)
+						{
+							numRounds = stoi(numrounds);
+						}
+					}
+					file.close();
 					while (true) 
 					{
 						Sleep(1000);
 						seconds++;
+						cout << "Is running:" << isRunning(FindWindowA(NULL, "Skullgirls Encore")) << endl;
+						cout << "Number of rounds" << numRounds << endl;
 						ReadProcessMemory(handle, (PBYTE*)AddressOfP1Win, &readP1Win, sizeof(int), 0);
 						ReadProcessMemory(handle, (PBYTE*)AddressOfP2Win, &readP2Win, sizeof(int), 0);
-						if (seconds > 240)
+						if (isRunning(FindWindowA(NULL, "Skullgirls Encore")))
 						{
-							cout << "No Winner Could Be Found...\n" << endl;
-							system("curl --location --request GET localhost:8080 --form winner='None'");
-							break;
+							if (seconds > 240)
+							{
+								cout << "No Winner Could Be Found...\n" << endl;
+								system("curl --location --request GET localhost:8080 --form winner='None'");
+								Sleep(5000);
+								break;
 
-						}
-						if (readP1Win)
-						{
-							cout << "Player 1 Wins!" << endl;
-							system("curl --location --request GET localhost:8080 --form winner='Player1'");
-							
-							break;
-						}
-						if (readP2Win)
-						{
-							cout << "Player 2 Wins!" << endl;
-							system("curl --location --request GET localhost:8080 --form winner='Player2'");
-							
-							break;
+							}
+							if (readP1Win == numRounds)
+							{
+								cout << "Player 1 Wins!" << endl;
+								system("curl --location --request GET localhost:8080 --form winner='Player1'");
+								Sleep(5000);
+								break;
+							}
+							if (readP2Win == numRounds)
+							{
+								cout << "Player 2 Wins!" << endl;
+								system("curl --location --request GET localhost:8080 --form winner='Player2'");
+								Sleep(5000);
+								break;
 
+							}
+							if (!(readP2Win == numRounds) && !(readP1Win == numRounds))
+							{
+								cout << "Game In Progress..." << endl;
+
+							}
+							if (GetAsyncKeyState(VK_NUMPAD0)) { // Exit
+								return 0;
+							}
 						}
-						if (!(readP2Win) && !(readP1Win))
+						else
 						{
-							cout << "Game In Progress..." << endl;
-							
-						}
-						if (GetAsyncKeyState(VK_NUMPAD0)) { // Exit
-							return 0;
+							cout << "Replay Caused a Crash!" << endl;
+							system("curl --location --request GET localhost:8080 --form winner='RIP'");
+							Sleep(10000);
+							exit(-1);
 						}
 					}
 				}

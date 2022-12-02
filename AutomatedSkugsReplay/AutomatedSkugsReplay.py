@@ -1,16 +1,15 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import time
-import pyodbc
+import time, pyodbc, threading, os, win32com.client, win32process, win32gui, signal
 import vgamepad as vg
-from pywinauto.findwindows    import find_window
+from pywinauto.findwindows import find_window
 from win32gui import SetForegroundWindow
-import threading
-import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 hostName = "localhost"
 serverPort = 8080
 currentIndex = 0
-def navigateToReplayMenu():
+
+def navigateToReplayMenu(shell):
+    shell.SendKeys('%')
     SetForegroundWindow(find_window(title='Skullgirls Encore'))
     time.sleep(2)
     #navigates to replay menu and starts the first replay
@@ -65,7 +64,39 @@ def navigateToReplayMenu():
     x = threading.Thread(target=gamepad.update, args=())
     x.start()
     
+def fastForward(shell):
+    shell.SendKeys('%')
+    SetForegroundWindow(find_window(title='Skullgirls Encore'))
     
+    time.sleep(10)
+    gamepad.right_trigger(value=0)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+    time.sleep(.2)
+    gamepad.right_trigger(value=255)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+
+def startNextReplay(shell):
+    shell.SendKeys('%')
+    SetForegroundWindow(find_window(title='Skullgirls Encore'))
+    time.sleep(2)
+    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+    time.sleep(.2)
+    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+    time.sleep(.5)
+    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+    time.sleep(.2)
+    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+    x = threading.Thread(target=gamepad.update, args=())
+    x.start()
+    time.sleep(.2)
 
 def getUnsolvedData(cursor):
     unresolvedReplayData = []
@@ -74,7 +105,20 @@ def getUnsolvedData(cursor):
         unresolvedReplayData.append(x)
     return unresolvedReplayData
 
-#CURL REQUEST CMD COMMAND 
+def writeNextReplay():
+    z = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.rnd", 'wb')
+    c = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.ini", 'w')
+    z.write(unresolvedReplayData[currentIndex][3])
+    z.close()
+    c.write(unresolvedReplayData[currentIndex][4])
+    c.close()
+
+def get_window_pid(title):
+    hwnd = win32gui.FindWindow(None, title)
+    threadid,pid = win32process.GetWindowThreadProcessId(hwnd)
+    return pid
+
+#CURL GET REQUEST CMD COMMAND 
 #curl --location --request GET localhost:8080 --form winner="Player1"
 class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -95,41 +139,17 @@ class MyServer(BaseHTTPRequestHandler):
                 connection.commit()
                 currentIndex += 1
                 try:
-                    z = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.rnd", 'wb')
-                    c = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.ini", 'w')
-                    z.write(unresolvedReplayData[currentIndex][3])
-                    z.close()
-                    c.write(unresolvedReplayData[currentIndex][4])
-                    c.close()
+                    writeNextReplay()
                     print("Overwrite complete.")
                     time.sleep(20)
-                    SetForegroundWindow(find_window(title='Skullgirls Encore'))
-                    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(10)
-                    gamepad.right_trigger(value=0)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.right_trigger(value=255)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    
+                    startNextReplay(shell)
+                    fastForward(shell)
+
                 except:
-                    print("No more to write.\n")
+                    print("No more to write.\nCloeaning up")
+                    os.kill(get_window_pid("SuperCoolCode"), signal.SIGTERM)
+                    os.kill(get_window_pid("Skullgirls Encore"), signal.SIGTERM)
+
                 
             if not(post_data.find("Player2") == -1):
                 print("player2wins")
@@ -139,82 +159,63 @@ class MyServer(BaseHTTPRequestHandler):
                 connection.commit()
                 currentIndex += 1
                 try:
-                    z = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.rnd", 'wb')
-                    c = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.ini", 'w')
-                    z.write(unresolvedReplayData[currentIndex][3])
-                    z.close()
-                    c.write(unresolvedReplayData[currentIndex][4])
-                    c.close()
+                    writeNextReplay()
                     print("Overwrite complete.")
                     time.sleep(20)
-                    SetForegroundWindow(find_window(title='Skullgirls Encore'))
-                    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(.2)
-                    gamepad.right_trigger(value=0)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
-                    time.sleep(10)
-                    gamepad.right_trigger(value=255)
-                    x = threading.Thread(target=gamepad.update, args=())
-                    x.start()
+                    startNextReplay(shell)
+                    fastForward(shell)
                 except:
-                    print("No more to write...\n")
-                if not(post_data.find("None") == -1):
-                    print("Could Not Resolve. Going to next replay")
-                    currentCommand = "UPDATE replaydatabase.replaymessages SET resolved = 1 , winner = 'Could Not Resolve' WHERE submission = " + str(unresolvedReplayData[currentIndex][6]) + " AND id ='" + unresolvedReplayData[currentIndex][5] + "';"
-                    print(currentCommand)
-                    cursor.execute(currentCommand)
-                    connection.commit()
-                    currentIndex += 1
-                    try:
-                        z = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.rnd", 'wb')
-                        c = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.ini", 'w')
-                        z.write(unresolvedReplayData[currentIndex][3])
-                        z.close()
-                        c.write(unresolvedReplayData[currentIndex][4])
-                        c.close()
-                        print("Overwrite complete.")
-                        time.sleep(20)
-                        SetForegroundWindow(find_window(title='Skullgirls Encore'))
-                        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                        time.sleep(.2)
-                        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                        time.sleep(.2)
-                        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                        time.sleep(.2)
-                        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                        time.sleep(.2)
-                        gamepad.right_trigger(value=0)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                        time.sleep(10)
-                        gamepad.right_trigger(value=255)
-                        x = threading.Thread(target=gamepad.update, args=())
-                        x.start()
-                    except:
-                        print("No more to write.\n")
+                    print("No more to write.\nCleaning up")
+                    os.kill(get_window_pid("SuperCoolCode"), signal.SIGTERM)
+                    os.kill(get_window_pid("Skullgirls Encore"), signal.SIGTERM)
+            if not(post_data.find("None") == -1):
+                print("Could Not Resolve. Going to next replay")
+                currentCommand = "UPDATE replaydatabase.replaymessages SET resolved = 1 , winner = 'Could Not Resolve' WHERE submission = " + str(unresolvedReplayData[currentIndex][6]) + " AND id ='" + unresolvedReplayData[currentIndex][5] + "';"
+                print(currentCommand)
+                cursor.execute(currentCommand)
+                connection.commit()
+                currentIndex += 1
+                try:
+                    writeNextReplay()
+                    print("Overwrite complete.")
+                    time.sleep(20)
+                    startNextReplay(shell)
+                    fastForward(shell)
+                except:
+                    print("No more to write.\nCleaning up")
+                    os.kill(get_window_pid("SuperCoolCode"), signal.SIGTERM)
+                    os.kill(get_window_pid("Skullgirls Encore"), signal.SIGTERM)
+            if not(post_data.find("RIP") == -1):
+                print("Killing Win Finder C++ App")
+                os.kill(get_window_pid("SuperCoolCode"), signal.SIGTERM)
+                time.sleep(10)
+                print("Replay Crashed Skullgirls. Going to next replay")
+                currentCommand = "UPDATE replaydatabase.replaymessages SET resolved = 1 , winner = 'Replay Caused Crash' WHERE submission = " + str(unresolvedReplayData[currentIndex][6]) + " AND id ='" + unresolvedReplayData[currentIndex][5] + "';"
+                print(currentCommand)
+                cursor.execute(currentCommand)
+                connection.commit()
+                currentIndex += 1
+                gamepad.reset()
+                x = threading.Thread(target=gamepad.update, args=())
+                x.start()
+                time.sleep(.5)
+                print("Opening skullgirls...\n")
+                os.startfile(r".\CoolAndProgramy")
+                time.sleep(10)
+                print("Navigating to replay menu...\n")
+                navigateToReplayMenu(shell)
+                
+                try:
+                    writeNextReplay()
+                    print("Overwrite complete.")
+                    print("Invoking Win Finder C++ App")
+                    os.startfile(r".\SuperCoolCode")
+                    time.sleep(5)
+                    startNextReplay(shell)
+                    fastForward(shell)
+                except:
+                    print("No more to write.\nCleaning up")
+                    os.kill(get_window_pid("Skullgirls Encore"), signal.SIGTERM)
         except Exception as err:
             print(err)
             self.wfile.write("POST request for {}".format(self.path).encode('utf-8'))
@@ -231,46 +232,31 @@ class MyServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(bytes("True", "utf-8"))
         unresolvedReplayData = getUnsolvedData(cursor)
-        print("Fetched Data from SQL Server...\n")
-        z = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.rnd", 'wb')
-        c = open(r"C:\Users\tanne\OneDrive\Documents\Skullgirls\Replays_SG2EPlus\76561198132030993\round_0001.ini", 'w')
-        z.write(unresolvedReplayData[currentIndex][3])
-        z.close()
-        c.write(unresolvedReplayData[currentIndex][4])
-        c.close()
-        print("Overwrite complete...\nOpening first replay\n")
-        print("Invoking Win Finder C++ App")
-        os.startfile(r".\SuperCoolCode")
-        time.sleep(5)
-        SetForegroundWindow(find_window(title='Skullgirls Encore'))
-        time.sleep(1)
-        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-        x = threading.Thread(target=gamepad.update, args=())
-        x.start()
-        time.sleep(.2)
-        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-        x = threading.Thread(target=gamepad.update, args=())
-        x.start()
-        time.sleep(.2)
-        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-        x = threading.Thread(target=gamepad.update, args=())
-        x.start()
-        time.sleep(.2)
-        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-        x = threading.Thread(target=gamepad.update, args=())
-        x.start()
-        time.sleep(5)
-        gamepad.right_trigger(value=255)
-        x = threading.Thread(target=gamepad.update, args=())
-        x.start()
+        if len(unresolvedReplayData) > 0:
+            print("Opening skullgirls...\n")
+            os.startfile(r".\CoolAndProgramy")
+            time.sleep(15)
+            
+            print("Navigating to replay menu...\n")
+            navigateToReplayMenu(shell)
         
-
+            print("Fetched Data from SQL Server...\n")
         
+            writeNextReplay()
+            print("Overwrite complete...\nOpening first replay\n")
         
-
+            print("Invoking Win Finder C++ App")
+            os.startfile(r".\SuperCoolCode")
+            time.sleep(10)
+            startNextReplay(shell)
+            fastForward(shell)
+        else:
+            print("No unresolved replays on database.\nWaiting for POST to start processes.....")
+            webServer.handle_request()
 
 if __name__ == "__main__":        
     gamepad = vg.VX360Gamepad()
+    shell = win32com.client.Dispatch("WScript.Shell")
     webServer = HTTPServer((hostName, serverPort), MyServer)
     connection = pyodbc.connect('driver=MySQL ODBC 8.0 Unicode Driver', host='localhost', database='replaydatabase', user='root', password='PooperScooper69')
     cursor = connection.cursor()
@@ -279,13 +265,8 @@ if __name__ == "__main__":
         #Fetch unresolved entries in SQL DataBase before the main program loop
         #gets list of rows as lists (lists in lists)
         #main program loop
-        print("Opening skullgirls...\n")
-        os.startfile(r".\CoolAndProgramy")
-        time.sleep(10)
-        global unresolvedReplayData
-        print("Navigating to replay menu...\n")
-        navigateToReplayMenu()
-        print("Done...\nWaiting for POST to start processes.....\n")
+        
+        print("Waiting for POST to start processes.....\n")
         while True:
             currentIndex = 0
             webServer.handle_request()
